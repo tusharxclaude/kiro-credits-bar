@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kiro Credits Bar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app" aria-live="polite">
+    <header class="top">
+      <div>
+        <h1>Kiro Credits Bar</h1>
+        <p class="sub" id="cycle">Waiting for the first reading…</p>
+      </div>
+      <div class="top-actions">
+        <span class="chip" id="plan" hidden></span>
+        <button class="icon-btn" id="btn-refresh" title="Refresh now" aria-label="Refresh now">↻</button>
+        <button class="icon-btn" id="btn-close" title="Close" aria-label="Close panel">✕</button>
+      </div>
+    </header>
+
+    <section id="banner" class="banner" hidden></section>
+
+    <section id="setup" class="card" hidden>
+      <h2>Welcome — confirm your working week</h2>
+      <p class="hint">Credits are spread over the days you work. Tick your working days, and mark any leave in the calendar below.</p>
+      <div class="weekdays" id="setup-weekdays"></div>
+      <button class="primary" id="btn-setup-done">Done</button>
+    </section>
+
+    <section class="card hero" id="hero">
+      <div class="hero-row">
+        <div>
+          <div class="big" id="hero-label">-- / --</div>
+          <div class="hero-sub">credits used today / today's budget</div>
+        </div>
+        <div class="pace" id="pace"></div>
+      </div>
+      <div class="bar" role="progressbar" aria-label="Used today against the daily budget" id="bar">
+        <div class="bar-fill" id="bar-fill"></div>
+        <div class="bar-mark" title="Daily budget"></div>
+      </div>
+      <div class="hero-foot" id="hero-foot"></div>
+    </section>
+
+    <section class="stats" id="stats"></section>
+
+    <section class="card">
+      <h2>Usage trend <span class="muted">this cycle</span></h2>
+      <div id="trend"></div>
+      <div class="legend"><span class="sw bar-sw"></span>used<span class="sw line-sw"></span>daily budget</div>
+    </section>
+
+    <section class="card">
+      <h2>Days until reset <span class="muted">tap a working day to mark leave</span></h2>
+      <div class="cal-head" id="cal-head"></div>
+      <div class="cal" id="calendar"></div>
+    </section>
+
+    <details class="card" id="settings">
+      <summary>Settings</summary>
+      <h3>Working days</h3>
+      <div class="weekdays" id="weekdays"></div>
+      <h3>Kiro CLI location</h3>
+      <p class="hint">Leave empty to find it automatically.</p>
+      <div class="row">
+        <input id="cli-path" type="text" placeholder="/path/to/kiro-cli" spellcheck="false">
+        <button id="btn-cli-save">Save &amp; retry</button>
+      </div>
+    </details>
+
+    <details class="card" id="manual">
+      <summary>Enter credits by hand</summary>
+      <p class="hint">Use this if Kiro can't be read. A live reading replaces it as soon as one works.</p>
+      <label>Allowance this cycle <input id="m-allow" type="number" min="1" step="any" inputmode="decimal"></label>
+      <label>Credits remaining <input id="m-remaining" type="number" min="0" step="any" inputmode="decimal"></label>
+      <label>Cycle resets on <input id="m-reset" type="date"></label>
+      <button id="btn-manual">Use these numbers</button>
+    </details>
+
+    <footer class="foot">
+      <span id="updated" class="muted"></span>
+      <button class="link" id="btn-quit">Quit</button>
+    </footer>
+  </main>
+  <script src="dev-mock.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Kiro Credits Bar",
+  "version": "0.1.0",
+  "identifier": "dev.kirocredits.bar",
+  "build": {
+    "frontendDist": "./ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Kiro Credits Bar",
+        "width": 380,
+        "height": 640,
+        "visible": false,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ],
+    "publisher": "Kiro Credits Bar contributors",
+    "copyright": "Copyright (c) 2026 Kiro Credits Bar contributors",
+    "category": "Utility",
+    "shortDescription": "Daily Kiro credit budget in your menu bar",
+    "longDescription": "An unofficial, read-only tray app that spreads your Kiro credits across your remaining working days and shows whether you are ahead of or behind pace."
+  }
+}

@@ -1,0 +1,13 @@
+[package]
+name = "kcb-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tusharxclaude/kiro-credits-bar"
+publish = false
+description = "Pure logic for Kiro Credits Bar: usage parsing, daily budget, pace."
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }

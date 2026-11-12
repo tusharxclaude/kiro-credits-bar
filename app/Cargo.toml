@@ -1,0 +1,19 @@
+[package]
+name = "kcb-app"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tusharxclaude/kiro-credits-bar"
+publish = false
+description = "Kiro Credits Bar: a tray app that shows today's Kiro credit budget."
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+kcb-core = { path = "../core" }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-notification = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
