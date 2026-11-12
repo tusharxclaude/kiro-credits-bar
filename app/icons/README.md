@@ -11,3 +11,12 @@ included**, and the app is not affiliated with Kiro. Please keep it that way unl
 has given permission.
 
 Regenerate with `python3 -I tools/make_icons.py` (no dependencies besides Python 3).
+
+## Platform icon files
+
+`icon.ico` (Windows, required by the build), `icon.icns` (macOS) and the `32x32`, `128x128` and
+`128x128@2x` PNGs are generated from `icon.png` with Tauri's icon tool:
+
+```sh
+cd app && cargo tauri icon icons/icon.png -o /tmp/icons   # then copy those five files into icons/
+```

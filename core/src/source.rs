@@ -257,6 +257,16 @@ mod tests {
     mod process {
         use super::*;
         use std::os::unix::fs::PermissionsExt;
+        use std::sync::{Mutex, MutexGuard};
+
+        /// These tests write a script and then run it. If another test forks a process in between,
+        /// the child briefly inherits the still-open write handle and Linux refuses to run the
+        /// script ("Text file busy"). Running them one at a time avoids that race.
+        static SERIAL: Mutex<()> = Mutex::new(());
+
+        fn serial() -> MutexGuard<'static, ()> {
+            SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+        }
 
         fn script(name: &str, body: &str) -> PathBuf {
             let dir = std::env::temp_dir().join(format!("kcb-test-{}-{name}", std::process::id()));
@@ -269,6 +279,7 @@ mod tests {
 
         #[test]
         fn passes_the_pinned_arguments_and_returns_stdout() {
+            let _guard = serial();
             // The stand-in only prints a valid reading if it was given exactly the pinned args.
             let path = script(
                 "args",
@@ -282,12 +293,14 @@ printf 'Estimated Usage | resets on 2026-12-01 | KIRO PRO+\nCredits (10 of 2000 
 
         #[test]
         fn a_missing_program_is_not_installed() {
+            let _guard = serial();
             let mut src = CliSource::new("/definitely/not/here/kiro-cli");
             assert!(matches!(src.read(), Err(SourceError::NotInstalled(_))));
         }
 
         #[test]
         fn a_nonzero_exit_is_a_failure_with_a_hint() {
+            let _guard = serial();
             let path = script("exit", "echo 'not logged in' >&2; exit 1");
             let err = CliSource::new(path).read().unwrap_err();
             match err {
@@ -298,6 +311,7 @@ printf 'Estimated Usage | resets on 2026-12-01 | KIRO PRO+\nCredits (10 of 2000 
 
         #[test]
         fn a_hung_cli_is_killed_at_the_timeout() {
+            let _guard = serial();
             let path = script("hang", "sleep 30");
             let mut src = CliSource::new(path);
             src.timeout = Duration::from_millis(300);
