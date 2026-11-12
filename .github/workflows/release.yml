@@ -136,6 +136,16 @@ jobs:
           pattern: installers-*
           merge-multiple: true
 
+      # GitHub turns spaces in uploaded file names into dots. Do it here first so the names in
+      # SHA256SUMS.txt match the files people actually download.
+      - name: Normalise file names
+        working-directory: dist
+        run: |
+          for f in *\ *; do
+            [ -e "$f" ] && mv "$f" "${f// /.}"
+          done
+          ls
+
       - name: Checksums
         working-directory: dist
         run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
