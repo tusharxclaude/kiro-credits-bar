@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main id="app" aria-live="polite">
+  <main id="app">
     <header class="top">
       <div>
         <h1>Kiro Credits Bar</h1>
@@ -20,15 +20,25 @@
       </div>
     </header>
 
-    <section id="banner" class="banner" hidden></section>
+    <nav class="tabs" role="tablist" aria-label="Credits pages">
+      <button id="tab-today" role="tab" aria-controls="page-today" aria-selected="true" tabindex="0" data-page="today"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><span>Today</span></button>
+      <button id="tab-history" role="tab" aria-controls="page-history" aria-selected="false" tabindex="-1" data-page="history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 15V9m6 6V5m6 10v-7"/></svg><span>History</span></button>
+      <button id="tab-schedule" role="tab" aria-controls="page-schedule" aria-selected="false" tabindex="-1" data-page="schedule"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span>Schedule</span></button>
+      <button id="tab-settings" role="tab" aria-controls="page-settings" aria-selected="false" tabindex="-1" data-page="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="3"/><circle cx="16" cy="17" r="3"/></svg><span>Settings</span></button>
+    </nav>
+
+    <div class="workspace">
+    <section id="banner" class="banner" role="status" hidden></section>
 
     <section id="setup" class="card" hidden>
       <h2>Welcome — confirm your working week</h2>
-      <p class="hint">Credits are spread over the days you work. Tick your working days, and mark any leave in the calendar below.</p>
+      <p class="hint">Credits are spread over the days you work. Tick your working days, and mark any leave in Schedule.</p>
       <div class="weekdays" id="setup-weekdays"></div>
       <button class="primary" id="btn-setup-done">Done</button>
     </section>
 
+    <section id="page-today" class="tab-page" role="tabpanel" aria-labelledby="tab-today" tabindex="0">
+    <div class="page-heading"><span class="eyebrow">Your daily pace</span><h2>Today, at a glance</h2></div>
     <section class="card hero" id="hero">
       <div class="hero-row">
         <div>
@@ -37,38 +47,59 @@
         </div>
         <div class="pace" id="pace"></div>
       </div>
-      <div class="bar" role="progressbar" aria-label="Used today against the daily budget" id="bar">
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="140" aria-valuenow="0" aria-label="Used today against the daily budget" id="bar">
         <div class="bar-fill" id="bar-fill"></div>
         <div class="bar-mark" title="Daily budget"></div>
       </div>
       <div class="hero-foot" id="hero-foot"></div>
+      <dl class="budget-breakdown" id="budget-breakdown"></dl>
+      <p class="page-note" id="coverage"></p>
     </section>
 
-    <section class="stats" id="stats"></section>
+    <section class="stats" id="stats" aria-label="Cycle summary"></section>
+    <p class="page-note">Unused credits carry into the next working day. Overspending is deducted.</p>
+    </section>
 
+    <section id="page-history" class="tab-page" role="tabpanel" aria-labelledby="tab-history" tabindex="0" hidden>
+    <div class="page-heading"><span class="eyebrow">This billing cycle</span><h2>Usage history</h2><p>See how each recorded day compares with its budget.</p></div>
     <section class="card">
-      <h2>Usage trend <span class="muted">this cycle</span></h2>
+      <h3 class="chart-heading">Daily credits</h3>
       <div id="trend"></div>
       <div class="legend"><span class="sw bar-sw"></span>used<span class="sw line-sw"></span>daily budget</div>
     </section>
 
+    <p class="page-note">Only recorded days appear. Usage before the first reading of a day is included in the cycle total, but not that day's bar.</p>
+    </section>
+
+    <section id="page-schedule" class="tab-page" role="tabpanel" aria-labelledby="tab-schedule" tabindex="0" hidden>
+    <div class="page-heading"><span class="eyebrow">Make room for time off</span><h2>Your schedule</h2><p>Select a working day to mark leave. Your budget updates automatically.</p></div>
     <section class="card">
-      <h2>Days until reset <span class="muted">tap a working day to mark leave</span></h2>
+      <h3 class="chart-heading">Days until reset</h3>
       <div class="cal-head" id="cal-head"></div>
       <div class="cal" id="calendar"></div>
     </section>
 
-    <details class="card" id="settings">
-      <summary>Settings</summary>
+    <section class="card schedule-week">
       <h3>Working days</h3>
       <div class="weekdays" id="weekdays"></div>
+    </section>
+    <div class="calendar-key"><span>Outlined: today</span><span>Amber: leave</span></div>
+    </section>
+
+    <section id="page-settings" class="tab-page" role="tabpanel" aria-labelledby="tab-settings" tabindex="0" hidden>
+    <div class="page-heading"><span class="eyebrow">Keep things connected</span><h2>Settings</h2><p>Manage your Kiro connection and manual readings.</p></div>
+    <section class="card">
+      <label class="toggle-row"><span><strong>Start at login</strong><small>Keep tracking quietly in the menu bar.</small></span><input id="autostart" type="checkbox" disabled></label>
+      <p class="hint" id="autostart-status" role="status">Checking login setting…</p>
+    </section>
+    <section class="card" id="settings">
       <h3>Kiro CLI location</h3>
       <p class="hint">Leave empty to find it automatically.</p>
       <div class="row">
-        <input id="cli-path" type="text" placeholder="/path/to/kiro-cli" spellcheck="false">
+        <input aria-label="Kiro CLI location" id="cli-path" type="text" placeholder="/path/to/kiro-cli" spellcheck="false">
         <button id="btn-cli-save">Save &amp; retry</button>
       </div>
-    </details>
+    </section>
 
     <details class="card" id="manual">
       <summary>Enter credits by hand</summary>
@@ -78,6 +109,9 @@
       <label>Cycle resets on <input id="m-reset" type="date"></label>
       <button id="btn-manual">Use these numbers</button>
     </details>
+
+    </section>
+    </div>
 
     <footer class="foot">
       <span id="updated" class="muted"></span>

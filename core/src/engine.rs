@@ -7,7 +7,7 @@ use crate::budget::{Pace, Schedule};
 use crate::ledger::{DayView, Ledger, TrendPoint};
 use crate::source::{PollOutcome, Poller, UsageSource};
 use crate::usage::UsageReading;
-use chrono::{Datelike, Duration, NaiveDate};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Persisted user choices.
@@ -52,6 +52,7 @@ pub struct CalendarDay {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Snapshot {
     pub today: NaiveDate,
+    pub last_checked_at: Option<DateTime<Utc>>,
     pub view: Option<DayView>,
     pub notice: Option<Notice>,
     /// True when the numbers came from manual entry rather than Kiro.
@@ -132,6 +133,8 @@ impl<S: UsageSource> Engine<S> {
             PollOutcome::Reading(reading) => {
                 self.notice = None;
                 self.manual = false;
+                self.ledger.record(today, &reading, &self.settings.schedule);
+                self.ledger.checked(today, Utc::now());
                 self.last_reading = Some(reading);
             }
             PollOutcome::Unavailable(why) => self.notice = Some(Notice::Unavailable(why)),
@@ -156,6 +159,11 @@ impl<S: UsageSource> Engine<S> {
             used: allowance - remaining,
             total: allowance,
         });
+        self.ledger.record(
+            today,
+            self.last_reading.as_ref().unwrap(),
+            &self.settings.schedule,
+        );
         self.manual = true;
         self.update(today)
     }
@@ -178,10 +186,15 @@ impl<S: UsageSource> Engine<S> {
 
     /// Recompute the snapshot from what is known, without touching Kiro.
     pub fn update(&mut self, today: NaiveDate) -> Update {
-        let view = self
-            .last_reading
-            .clone()
-            .map(|r| self.ledger.record(today, &r, &self.settings.schedule));
+        let view = self.last_reading.clone().map(|r| {
+            if self.notice.is_none() && self.ledger.has_day(today) {
+                self.ledger.record(today, &r, &self.settings.schedule)
+            } else {
+                self.ledger
+                    .clone()
+                    .record(today, &r, &self.settings.schedule)
+            }
+        });
 
         let notify = match &view {
             Some(v) if !self.manual && self.notice.is_none() && v.pace != Pace::OnTrack => {
@@ -205,6 +218,7 @@ impl<S: UsageSource> Engine<S> {
         Update {
             snapshot: Snapshot {
                 today,
+                last_checked_at: self.ledger.last_checked_at,
                 view,
                 notice: self.notice.clone(),
                 manual: self.manual,
@@ -514,6 +528,21 @@ mod tests {
         assert_eq!(u.tray.tone, Tone::Grey);
         assert!(u.snapshot.view.is_none());
         assert!(u.snapshot.calendar.is_empty());
+    }
+
+    #[test]
+    fn failed_poll_across_midnight_does_not_create_a_daily_record() {
+        let mut r = rig();
+        r.engine.tick(d(2026, 11, 12));
+        let checked = r.engine.ledger().last_checked_at;
+        r.mode.set(1);
+        let stale = r.engine.tick(d(2026, 11, 13));
+        assert_eq!(stale.snapshot.last_checked_at, checked);
+        assert!(!r.engine.ledger().has_day(d(2026, 11, 13)));
+        r.used.set(20.0);
+        r.mode.set(0);
+        let recovered = r.engine.tick(d(2026, 11, 13));
+        assert_eq!(recovered.snapshot.view.unwrap().unallocated_usage, 20.0);
     }
 
     #[test]

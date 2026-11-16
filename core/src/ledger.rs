@@ -1,11 +1,11 @@
-//! Per-day records: the opening balance, today's view and the usage trend.
+//! Per-day records, anchored daily allowances, carryover and the usage trend.
 //!
 //! Kiro only reports a cycle total, so "used today" needs the remaining credits
 //! at the first reading of the day (the opening balance). That is stored here.
 
 use crate::budget::{self, Pace, Schedule};
 use crate::usage::UsageReading;
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -19,6 +19,11 @@ pub struct DayRecord {
     pub latest_remaining: f64,
     /// Daily budget as last computed (follows schedule edits during the day).
     pub budget: f64,
+    /// Usage between the previous recorded day and this day's first reading.
+    #[serde(default)]
+    pub unallocated_usage: f64,
+    #[serde(default)]
+    pub first_checked_at: Option<DateTime<Utc>>,
 }
 
 impl DayRecord {
@@ -37,6 +42,10 @@ pub struct DayView {
     pub remaining: f64,
     pub used_today: f64,
     pub daily_budget: f64,
+    pub base_allowance: f64,
+    pub carryover: f64,
+    pub unallocated_usage: f64,
+    pub first_checked_at: Option<DateTime<Utc>>,
     /// Budget minus used today; negative means over budget.
     pub budget_left: f64,
     pub working_days_left: u32,
@@ -53,6 +62,8 @@ pub struct TrendPoint {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Ledger {
     days: BTreeMap<NaiveDate, DayRecord>,
+    #[serde(default)]
+    pub last_checked_at: Option<DateTime<Utc>>,
 }
 
 impl Ledger {
@@ -75,7 +86,41 @@ impl Ledger {
             Some(existing) if existing.reset_on == reading.reset_on => existing.opening,
             _ => remaining, // first reading of the day, or the cycle just rolled over
         };
-        let budget = budget::daily_budget(opening, today, reading.reset_on, schedule);
+        // Anchor to the earliest observed balance; never invent a cycle start balance.
+        let (anchor_day, anchor_balance) = self
+            .days
+            .iter()
+            .find(|(date, r)| **date <= today && r.reset_on == reading.reset_on)
+            .map(|(date, r)| (*date, r.opening))
+            .unwrap_or((today, opening));
+        let anchor_days = budget::working_days_left(anchor_day, reading.reset_on, schedule);
+        let base = if anchor_days > 0 {
+            anchor_balance / anchor_days as f64
+        } else {
+            0.0
+        };
+        let days_left = budget::working_days_left(today, reading.reset_on, schedule);
+        let carryover = opening - base * days_left as f64;
+        let working = schedule.is_working(today) && days_left > 0;
+        let base_allowance = if working { base } else { 0.0 };
+        let budget = if working {
+            (base + carryover).clamp(0.0, opening)
+        } else {
+            0.0
+        };
+        let existing = self
+            .days
+            .get(&today)
+            .filter(|r| r.reset_on == reading.reset_on);
+        let unallocated_usage = existing.map(|r| r.unallocated_usage).unwrap_or_else(|| {
+            self.days
+                .range(..today)
+                .rev()
+                .find(|(_, r)| r.reset_on == reading.reset_on)
+                .map(|(_, r)| (r.latest_remaining - remaining).max(0.0))
+                .unwrap_or(0.0)
+        });
+        let first_checked_at = existing.and_then(|r| r.first_checked_at);
         self.days.insert(
             today,
             DayRecord {
@@ -83,6 +128,8 @@ impl Ledger {
                 opening,
                 latest_remaining: remaining,
                 budget,
+                unallocated_usage,
+                first_checked_at,
             },
         );
 
@@ -95,10 +142,26 @@ impl Ledger {
             remaining,
             used_today: used,
             daily_budget: budget,
+            base_allowance,
+            carryover: if working { carryover } else { 0.0 },
+            unallocated_usage,
+            first_checked_at,
             budget_left: budget::budget_left_today(used, budget),
             working_days_left: budget::working_days_left(today, reading.reset_on, schedule),
             pace: budget::pace(used, budget),
         }
+    }
+
+    /// Called only for a successful live read, never for a settings edit or stale view.
+    pub fn checked(&mut self, today: NaiveDate, at: DateTime<Utc>) {
+        self.last_checked_at = Some(at);
+        if let Some(day) = self.days.get_mut(&today) {
+            day.first_checked_at.get_or_insert(at);
+        }
+    }
+
+    pub fn has_day(&self, today: NaiveDate) -> bool {
+        self.days.contains_key(&today)
     }
 
     /// One point per recorded day of the billing cycle that ends on `reset_on`.
@@ -288,6 +351,70 @@ mod tests {
         let restored = Ledger::from_json(&l.to_json()).unwrap();
         assert_eq!(restored, l);
         assert!(Ledger::from_json("not json").is_err());
+    }
+
+    #[test]
+    fn carryover_matches_the_100_plus_or_minus_20_examples() {
+        for (spent, expected) in [(80.0, 120.0), (120.0, 80.0), (0.0, 200.0)] {
+            let mut ledger = Ledger::new();
+            let schedule = Schedule::default();
+            let start = d(2026, 11, 26); // Thu, Fri, Mon: three working days
+            ledger.record(start, &reading(1700.0, RESET()), &schedule);
+            ledger.record(start, &reading(1700.0 + spent, RESET()), &schedule);
+            let mut restored = Ledger::from_json(&ledger.to_json()).unwrap();
+            let next = restored.record(
+                d(2026, 11, 27),
+                &reading(1700.0 + spent, RESET()),
+                &schedule,
+            );
+            assert!((next.base_allowance - 100.0).abs() < 1e-9);
+            assert!((next.daily_budget - expected).abs() < 1e-9);
+            assert!((next.carryover - (100.0 - spent)).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn offline_gap_reduces_carryover_without_inventing_daily_usage() {
+        let mut ledger = Ledger::new();
+        let s = Schedule::default();
+        ledger.record(d(2026, 11, 26), &reading(1700.0, RESET()), &s);
+        ledger.record(d(2026, 11, 26), &reading(1780.0, RESET()), &s);
+        let friday = ledger.record(d(2026, 11, 27), &reading(1800.0, RESET()), &s);
+        assert_eq!(friday.unallocated_usage, 20.0);
+        assert_eq!(friday.used_today, 0.0);
+        assert_eq!(friday.daily_budget, 100.0);
+        let later = ledger.record(d(2026, 11, 27), &reading(1810.0, RESET()), &s);
+        assert_eq!(later.unallocated_usage, 20.0);
+        assert_eq!(later.used_today, 10.0);
+    }
+
+    #[test]
+    fn weekend_has_no_base_and_debt_never_allows_negative_spending() {
+        let mut ledger = Ledger::new();
+        let s = Schedule::default();
+        ledger.record(d(2026, 11, 26), &reading(1700.0, RESET()), &s);
+        ledger.record(d(2026, 11, 26), &reading(1950.0, RESET()), &s);
+        let fri = ledger.record(d(2026, 11, 27), &reading(1950.0, RESET()), &s);
+        assert_eq!(fri.daily_budget, 0.0);
+        assert_eq!(fri.carryover, -150.0);
+        let sat = ledger.record(d(2026, 11, 28), &reading(1960.0, RESET()), &s);
+        assert_eq!(sat.base_allowance, 0.0);
+        assert_eq!(sat.daily_budget, 0.0);
+        let mon = ledger.record(d(2026, 11, 30), &reading(1960.0, RESET()), &s);
+        assert_eq!(mon.daily_budget, 40.0);
+    }
+
+    #[test]
+    fn old_ledgers_load_without_timestamps_or_gap_fields() {
+        let text = r#"{"days":{"2026-11-26":{"reset_on":"2026-12-01","opening":300.0,"latest_remaining":220.0,"budget":100.0}}}"#;
+        let mut ledger = Ledger::from_json(text).unwrap();
+        assert_eq!(ledger.last_checked_at, None);
+        let next = ledger.record(
+            d(2026, 11, 27),
+            &reading(1780.0, RESET()),
+            &Schedule::default(),
+        );
+        assert_eq!(next.daily_budget, 120.0);
     }
 
     #[test]

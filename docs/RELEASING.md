@@ -91,7 +91,7 @@ Nothing to sign. `SHA256SUMS.txt` is attached to each release so users can verif
 
 ## Known gaps
 
-- The workflows have **not been run yet**. Expect to fix small things on the first tag, most likely
-  the Linux system libraries or the Windows installer step.
+- CI and release workflows have produced builds for all target platforms. Windows and Linux
+  installers still need testing on real desktops.
 - Intel macOS builds are cross-compiled on an Apple Silicon runner.
 - There is no auto-update. Users download new releases themselves.

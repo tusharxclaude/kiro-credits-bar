@@ -15,6 +15,7 @@ use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow, WindowEvent};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_notification::NotificationExt;
 
 /// Kiro refreshes usage at most every 5 minutes, so polling faster gains nothing.
@@ -113,7 +114,7 @@ fn publish(app: &AppHandle, shared: &Shared, update: Update) -> Snapshot {
                 .builder()
                 .title("Kiro credits: over today's budget")
                 .body(format!(
-                    "Used {:.0} credits against a budget of {:.0}. Tomorrow's budget will shrink to make up for it.",
+                    "Used {:.0} credits against a budget of {:.0}. Overspending carries into the next working day.",
                     v.used_today, v.daily_budget
                 ))
                 .show();
@@ -200,10 +201,28 @@ async fn set_cli_path(
 ) -> Result<Snapshot, String> {
     Ok(with_engine(app, shared.inner().clone(), move |e| {
         e.set_cli_path(path.filter(|p| !p.trim().is_empty()));
+        e.source_mut().program = find_cli(&e.settings().cli_path);
         e.resume();
         e.tick(today())
     })
     .await)
+}
+
+#[tauri::command]
+fn autostart_enabled(app: AppHandle) -> Result<bool, String> {
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool, String> {
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable()
+    } else {
+        manager.disable()
+    }
+    .map_err(|e| e.to_string())?;
+    manager.is_enabled().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -245,8 +264,14 @@ fn show_panel_near(window: &WebviewWindow, click: PhysicalPosition<f64>) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .invoke_handler(tauri::generate_handler![
             get_state,
+            autostart_enabled,
+            set_autostart,
             refresh,
             resume,
             save_schedule,

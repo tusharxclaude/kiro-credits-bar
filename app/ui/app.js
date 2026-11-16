@@ -66,33 +66,45 @@ function renderBanner(s) {
 function renderHero(s) {
   const v = s.view;
   const tone = toneOf(v, s.notice);
+  const breakdown = $("budget-breakdown");
+  breakdown.replaceChildren();
+  $("coverage").textContent = "";
+  if (v && Number.isFinite(v.base_allowance)) {
+    for (const [label, value] of [["Base allowance", v.base_allowance], ["Carryover adjustment", v.carryover], ["Available today", v.daily_budget]]) {
+      breakdown.append(el("dt", {}, label), el("dd", {}, (label === "Carryover adjustment" && value > 0.000001 ? "+" : "") + fmt1(Math.abs(value) < 0.000001 ? 0 : value)));
+    }
+    const since = v.first_checked_at ? new Date(v.first_checked_at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : null;
+    $("coverage").textContent = since ? `Today tracked since ${since}.` : "Today's usage starts at the first reading, not midnight.";
+    if (v.unallocated_usage > 0) $("coverage").textContent += ` ${fmt1(v.unallocated_usage)} credits used between recorded days are included in your balance and carryover; their daily breakdown is unknown.`;
+  }
   $("hero").className = "card hero tone-" + tone;
   if (!v) {
     $("hero-label").textContent = "-- / --";
     $("pace").textContent = "No reading";
     $("bar-fill").style.width = "0";
-    $("hero-foot").textContent = "Waiting for Kiro, or enter your credits by hand below.";
+    $("bar").setAttribute("aria-valuenow", "0");
+    $("hero-foot").textContent = "Waiting for Kiro, or enter your credits by hand in Settings.";
     return;
   }
   $("hero-label").textContent = `${fmt(v.used_today)} / ${fmt(v.daily_budget)}`;
   // The track spans 0–140% of budget so the 100% mark and the red zone are both visible.
   const ratio = v.daily_budget > 0 ? v.used_today / v.daily_budget : v.used_today > 0 ? 1.4 : 0;
   $("bar-fill").style.width = Math.min(ratio / 1.4, 1) * 100 + "%";
-  $("bar").setAttribute("aria-valuenow", String(Math.round(ratio * 100)));
+  $("bar").setAttribute("aria-valuenow", String(Math.min(140, Math.round(ratio * 100))));
 
   let pace, foot;
   const isDayOff = v.daily_budget === 0 && v.working_days_left >= 0 && !isWorkingToday(s);
   if (isDayOff) {
     pace = v.used_today > 0 ? "Day off — used" : "Day off";
     foot = v.used_today > 0
-      ? `${fmt(v.used_today)} credits used on a day off. Tomorrow's budget absorbs it.`
+      ? `${fmt(v.used_today)} credits used on a day off. It reduces the next working day's carryover.`
       : "Nothing planned today. Unused credits stay in the pot.";
   } else if (v.budget_left >= 0) {
     pace = tone === "green" ? "On track" : "Within budget";
     foot = `${fmt(v.budget_left)} left of today's budget.`;
   } else {
     pace = tone === "red" ? "Well over budget" : "Over budget";
-    foot = `${fmt(-v.budget_left)} over today's budget. Tomorrow's budget shrinks to make up for it.`;
+    foot = `${fmt(-v.budget_left)} over today's budget. It will be deducted from the next working day.`;
   }
   if (s.notice) pace = "Last reading";
   $("pace").textContent = pace;
@@ -170,6 +182,9 @@ function renderTrend(s) {
     t.textContent = `${dayLabel(p.date)}: used ${fmt(p.used)}, budget ${fmt(p.budget)}`;
     bar.append(t);
     const cx = x + slot / 2;
+    if (pts.length === 1) {
+      add("circle", { cx, cy: y(p.budget), r: 2.5, fill: "currentColor", "fill-opacity": ".6" });
+    }
     path += `${i === 0 ? "M" : "L"}${cx.toFixed(1)},${y(p.budget).toFixed(1)} `;
     if (pts.length <= 12 || i % 2 === 0) {
       add("text", { x: cx, y: H - 4, "text-anchor": "middle", "font-size": "9", fill: "currentColor", "fill-opacity": ".6" },
@@ -240,8 +255,8 @@ function renderSettings(s) {
   if (!s.settings.setup_done) {
     weekdayBoxes($("setup-weekdays"), s, () => {});
   }
-  // Don't rebuild the boxes under the user's cursor while Settings is open.
-  if (!$("settings").open) {
+  // Preserve keyboard focus while a working-day checkbox is in use.
+  if (!$("weekdays").contains(document.activeElement)) {
     weekdayBoxes($("weekdays"), s, () =>
       saveSchedule(pickedWeekdays($("weekdays")), s.settings.schedule.leave_days, true));
   }
@@ -263,8 +278,33 @@ function render(s) {
   renderTrend(s);
   renderCalendar(s);
   renderSettings(s);
-  $("updated").textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  renderFreshness();
 }
+
+function renderFreshness() {
+  const at = snap?.last_checked_at;
+  $("updated").textContent = snap?.manual ? "Manual reading" : at
+    ? "Last checked " + new Date(at).toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"})
+    : "No successful check yet";
+}
+
+const autostart = $("autostart");
+invoke("autostart_enabled").then((enabled) => {
+  autostart.checked = enabled;
+  autostart.disabled = false;
+  $("autostart-status").textContent = "You can change this anytime.";
+}).catch((e) => { $("autostart-status").textContent = "Login setting unavailable: " + e; });
+autostart.addEventListener("change", async () => {
+  const wanted = autostart.checked;
+  autostart.disabled = true;
+  try {
+    autostart.checked = await invoke("set_autostart", {enabled: wanted});
+    $("autostart-status").textContent = autostart.checked ? "Will start at your next login." : "Automatic launch is off.";
+  } catch (e) {
+    autostart.checked = !wanted;
+    $("autostart-status").textContent = "Could not change login setting: " + e;
+  } finally { autostart.disabled = false; }
+});
 
 async function run(promise) {
   const btn = $("btn-refresh");
@@ -295,6 +335,31 @@ $("btn-manual").addEventListener("click", () => {
     return;
   }
   run(invoke("manual_entry", { entry: { reset_on: resetOn, allowance, remaining } }));
+});
+
+// Keep navigation independent of live snapshots, so polling never changes the page.
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+function selectPage(tab, focus = false) {
+  for (const item of tabs) {
+    const selected = item === tab;
+    item.setAttribute("aria-selected", String(selected));
+    item.tabIndex = selected ? 0 : -1;
+    $("page-" + item.dataset.page).hidden = !selected;
+  }
+  if (focus) tab.focus();
+}
+tabs.forEach((tab, index) => {
+  tab.addEventListener("click", () => selectPage(tab));
+  tab.addEventListener("keydown", (event) => {
+    let next;
+    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+    if (event.key === "ArrowLeft") next = (index + tabs.length - 1) % tabs.length;
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = tabs.length - 1;
+    if (next === undefined) return;
+    event.preventDefault();
+    selectPage(tabs[next], true);
+  });
 });
 
 // Live updates pushed from the Rust poller.

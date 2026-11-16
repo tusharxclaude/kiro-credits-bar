@@ -16,6 +16,7 @@
   const reset = new Date("2026-12-01T12:00:00Z");
   const leave = new Set(["2026-11-17"]);
   let weekdays = [0, 1, 2, 3, 4];
+  let autostart = false;
   let setupDone = mode !== "setup";
 
   function calendar() {
@@ -43,10 +44,12 @@
     ].map(([date, u, b]) => ({ date, used: u, budget: b }));
     return {
       today: iso(today),
+      last_checked_at: mode === "nodata" ? null : new Date().toISOString(),
       view: mode === "nodata" ? null : {
         plan: "KIRO PRO+", allowance: 2000, reset_on: iso(reset), opening_balance: opening,
         remaining: opening - used, used_today: used, daily_budget: budget, budget_left: budget - used,
         working_days_left: workingLeft, pace,
+        base_allowance: budget - 20, carryover: 20, unallocated_usage: 0, first_checked_at: new Date().toISOString(),
       },
       notice: mode === "halted" ? { kind: "Halted", reason: "unexpected /usage output: first line is not `Estimated Usage | resets on <date> | <plan>`" }
         : mode === "unavailable" ? { kind: "Unavailable", reason: "No such file or directory (os error 2)" } : null,
@@ -59,6 +62,8 @@
 
   const handlers = {
     get_state: () => build(),
+    autostart_enabled: () => autostart,
+    set_autostart: ({enabled}) => (autostart = enabled),
     refresh: () => build(),
     resume: () => build(),
     set_cli_path: () => build(),

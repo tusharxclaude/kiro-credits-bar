@@ -27,15 +27,17 @@ It is **read-only**: it never limits, blocks or changes anything in Kiro.
 ### How the budget works
 
 ```
-daily budget = credits remaining at the start of the day ÷ working days left (counting today)
+base allowance = credits at the first tracked balance ÷ working days from that day to reset
+available today = base allowance + accumulated carryover (bounded by 0 and credits left)
 ```
 
-- The budget is **fixed for the day**, so the bar fills as you spend instead of shrinking under you.
-- Tomorrow's budget absorbs today's over- or under-spend, so you land on zero at the end of the cycle.
+- The base allowance is anchored to the earliest recorded opening balance in the cycle. Changing your schedule recalculates it; usage during the day does not.
+- Unused allowance carries into the next working day; overspending is deducted. With a base of 100, spending 80 gives you 120 next time; spending 120 leaves 80. Carryover clears at the next billing cycle.
+- Today shows the base allowance, carryover adjustment, and available budget separately. A negative adjustment can reduce the available budget to zero.
 - A day off (a non-working weekday, or leave you marked) has a budget of 0. Credits spent on one
-  are not an error; they reduce the next working day's budget.
-- Days you didn't use Kiro need no special handling. The unused credits simply spread across the
-  remaining days.
+  are not an error; they reduce the next working day's carryover.
+- Days you didn't use Kiro need no special handling. The unused allowance carries into the
+  next working day.
 - The cycle length and allowance come straight from Kiro, so nothing needs configuring.
 
 ## Requirements
@@ -49,8 +51,8 @@ daily budget = credits remaining at the start of the day ÷ working days left (c
 
 ## Install and run
 
-There are no prebuilt releases yet. Installers for macOS, Windows and Linux will be published on the
-[Releases page](https://github.com/tusharxclaude/kiro-credits-bar/releases). Early builds will be
+Download preview installers for macOS, Windows and Linux from the
+[Releases page](https://github.com/tusharxclaude/kiro-credits-bar/releases). Preview builds are
 **unsigned**, so your OS will warn you the first time you open the app; see
 [docs/RELEASING.md](docs/RELEASING.md) for what to expect and why. From a checkout:
 
@@ -69,8 +71,12 @@ the tray. Click the icon to open the panel, right-click for **Refresh now** and 
 
 ### Settings
 
-Everything is in the panel's **Settings** section: working days, and the location of `kiro-cli` if
-it isn't found automatically. The app looks on your `PATH`, then in `~/.local/bin`,
+The panel has four icon tabs: **Today**, **History**, **Schedule**, and **Settings**.
+Choose working days and leave in Schedule. Settings includes an optional **Start at login** toggle
+(off until enabled), the location of `kiro-cli`, and manual entry. Login registration uses the OS
+and reports failures in the panel; enable it from your installed app so it points to a stable location.
+
+If the CLI isn't found automatically, set its path in Settings. The app looks on your `PATH`, then in `~/.local/bin`,
 `/usr/local/bin` and `/opt/homebrew/bin`.
 
 For development there are two environment variables:
@@ -101,8 +107,11 @@ For development there are two environment variables:
   will be needed.
 - **Usage is Kiro's estimate** and refreshes about every five minutes, which is how often the app
   polls.
-- **If the app starts late in the day**, credits spent before its first reading are counted against
-  the previous day.
+- **Daily coverage begins at the first reading, not midnight.** The panel shows that time and the
+  last successful live check. Usage between recorded days reduces the balance and carryover, but is
+  shown separately with an unknown daily breakdown. Days without readings are absent from History.
+  The initial reading cannot reconstruct usage earlier that day. Failed checks do not create records
+  for new days or advance the last-check time.
 - **Bank holidays aren't built in yet.** Mark them as leave for now.
 
 ## Development

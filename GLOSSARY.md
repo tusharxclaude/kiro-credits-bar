@@ -45,8 +45,20 @@ The remaining credits at the first reading of the day. It anchors both the daily
 _Avoid_: Snapshot, starting balance
 
 **Daily Budget**:
-The credits the user can spend today and still finish the billing cycle on zero: opening balance divided by the working days left, counting today. Fixed for the day once set; tomorrow's budget absorbs any over- or under-spend.
+The credits available to spend today: base allowance plus carryover, bounded by zero and the opening balance. A day off has no daily budget.
 _Avoid_: Daily limit, daily allowance, target
+
+**Base Allowance**:
+The credits assigned to each working day before carryover. Based on the earliest tracked opening balance and the working days from that day to reset; recalculated when the working schedule changes.
+_Avoid_: Plan allowance, daily limit
+
+**Carryover**:
+The accumulated unused base allowance from earlier working days, minus overspending. It adjusts the next working day's daily budget and clears at the billing reset. Usage on days off also reduces carryover.
+_Avoid_: Bonus credits, renewed credits
+
+**Unallocated Usage**:
+Credits used between recorded days whose daily breakdown is unknown. They reduce remaining credits and carryover, without being assigned to a specific day's used today.
+_Avoid_: Lost credits, uncounted credits
 
 **Used Today**:
 Opening balance minus the current remaining credits. This is what the bar shows against the daily budget.

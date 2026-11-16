@@ -164,3 +164,61 @@ details label input { margin-top: 3px; color: var(--text); }
   .bar-fill { transition: none; }
   .icon-btn.spin { animation: none; }
 }
+
+/* A compact workspace: navigation stays still while each page scrolls. */
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+main { height: 100dvh; padding: 20px 18px 10px; gap: 0; overflow: hidden; }
+.top { flex-shrink: 0; padding-bottom: 18px; align-items: center; }
+h1 { font-size: 15px; letter-spacing: -.025em; }
+.top-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 145px; }
+.chip { font-size: 9px; letter-spacing: .025em; }
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.tabs button { position: relative; border: 0; border-radius: 6px 6px 0 0; background: transparent; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 2px 13px; font-size: 11px; transition: color .15s, background .15s; }
+.tabs svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.tabs button:hover { background: var(--off); color: var(--text); }
+.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 650; }
+.tabs button[aria-selected="true"]::after { content: ""; position: absolute; bottom: -1px; height: 2px; left: 16px; right: 16px; background: var(--accent); border-radius: 2px; }
+.workspace { overflow-y: auto; flex: 1; min-height: 0; padding: 0 2px 16px; scrollbar-width: thin; }
+.tab-page { animation: page-enter .18s ease-out; }
+.page-heading { padding: 25px 0 22px; }
+.eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: .11em; color: var(--muted); }
+.page-heading h2 { font-size: 23px; font-weight: 650; letter-spacing: -.045em; margin: 5px 0 0; }
+.page-heading p { color: var(--muted); font-size: 12px; margin: 8px 0 0; line-height: 1.6; }
+.tab-page > .card { border: 0; border-radius: 0; padding: 0 0 20px; background: transparent; }
+.tab-page > .card + .card { padding-top: 20px; border-top: 1px solid var(--line); }
+.hero-row { flex-direction: column-reverse; gap: 18px; }
+.big { font-size: clamp(30px, 10vw, 40px); font-weight: 600; letter-spacing: -.05em; line-height: 1.2; }
+.hero-sub { margin-top: 5px; }
+.pace { font-size: 11px; border-radius: 4px; padding: 4px 8px; }
+.bar { height: 9px; margin: 22px 0 14px; }
+.hero-foot { line-height: 1.6; }
+.stats { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--line); }
+.stat { display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between; border: 0; border-radius: 0; background: transparent; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.stat b { font-size: 16px; font-weight: 600; }
+.stat span { font-size: 12px; }
+.page-note { color: var(--muted); font-size: 11px; line-height: 1.65; margin: 16px 0 0; }
+.chart-heading { margin: 0 0 16px; font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--text); }
+#trend svg { height: auto; min-height: 150px; }
+.legend { margin-top: 14px; }
+.day { padding: 10px 0; }
+.schedule-week h3 { margin-top: 0; }
+.weekdays { gap: 5px; }
+.weekdays label { padding: 5px; font-size: 11px; }
+.calendar-key { display: flex; gap: 16px; font-size: 10px; color: var(--muted); }
+#settings h3:first-child { margin-top: 0; }
+.banner, #setup { margin-top: 16px; }
+#setup h2 { line-height: 1.5; }
+.foot { flex-shrink: 0; border-top: 1px solid var(--line); padding: 9px 0 0; }
+@keyframes page-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .tab-page { animation: none; } .tabs button { transition: none; } }
+
+.budget-breakdown { display: grid; grid-template-columns: 1fr auto; gap: 9px; margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; }
+.budget-breakdown:empty { display: none; }
+.budget-breakdown dt { color: var(--muted); }
+.budget-breakdown dd { margin: 0; font-variant-numeric: tabular-nums; }
+.budget-breakdown dt:last-of-type, .budget-breakdown dd:last-child { color: var(--text); font-weight: 650; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+.toggle-row strong { font-size: 13px; font-weight: 600; }
+.toggle-row small { display: block; color: var(--muted); font-size: 11px; margin: 5px 0 12px; }
+.toggle-row input { width: 18px; height: 18px; accent-color: var(--accent); }
